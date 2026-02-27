@@ -57,6 +57,10 @@ def root():
 def test_page():
     return FileResponse(os.path.join(BASE_DIR, "test.html"))
 
+@app.get("/game")
+def game_page():
+    return FileResponse(os.path.join(BASE_DIR, "game.html"))
+
 @app.post("/render")
 def render(scene_input: SceneInput):
     scene = SceneGSS(
