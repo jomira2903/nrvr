@@ -13,7 +13,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from gss.scene import SceneGSS, SceneEntity
 from model.network import NeuralRenderer, gss_to_tensor
-
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 app = FastAPI(title="NRVR API")
 
 app.add_middleware(
@@ -46,6 +47,9 @@ class SceneInput(BaseModel):
 
 
 @app.get("/")
+@app.get("/test")
+def test_page():
+    return FileResponse("/home/nrvr/nrvr/test.html")
 def root():
     return {"status": "NRVR API active", "version": "0.1.0"}
 
