@@ -25,6 +25,12 @@ app.add_middleware(
 )
 
 model = NeuralRenderer(image_size=64)
+model_path = os.path.join(BASE_DIR, "model_trained.pth")
+if os.path.exists(model_path):
+    model.load_state_dict(torch.load(model_path, map_location='cpu'))
+    print("Modèle entraîné chargé !")
+else:
+    print("Modèle aléatoire (pas de fichier .pth)")
 model.eval()
 print("Modèle chargé !")
 
