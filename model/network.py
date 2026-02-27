@@ -60,31 +60,7 @@ class NeuralRenderer(nn.Module):
         return image.view(-1, 3, self.image_size, self.image_size)
 
 
-if __name__ == "__main__":
-    from gss.scene import SceneGSS, SceneEntity
-
-    scene = SceneGSS(
-        width=64, height=64,
-        entities=[
-            SceneEntity("SKY_CLEAR", 0.5, 0.2),
-            SceneEntity("GROUND_GRASS", 0.5, 0.8),
-            SceneEntity("TREE_OAK", 0.3, 0.6, scale=1.2),
-        ],
-        time_of_day=0.7,
-        weather="CLEAR"
-    )
-
-    model = NeuralRenderer(image_size=64)
-    tensor = gss_to_tensor(scene).unsqueeze(0)
-    output = model(tensor)
-
-    print(f"Entrée  : {tensor.shape}")
-    print(f"Sortie  : {output.shape}")
-    print(f"Min/Max : {output.min():.3f} / {output.max():.3f}")
-    print(f"Paramètres : {sum(p.numel() for p in model.parameters()):,}")
-    print("MODELE OK !")
-
-    class NeuralRendererCNN(nn.Module):
+class NeuralRendererCNN(nn.Module):
     def __init__(self, image_size=64):
         super().__init__()
         self.image_size = image_size
@@ -119,3 +95,27 @@ if __name__ == "__main__":
         features = features.view(-1, 256, 4, 4)
         image = self.decoder(features)
         return image
+
+
+if __name__ == "__main__":
+    from gss.scene import SceneGSS, SceneEntity
+
+    scene = SceneGSS(
+        width=64, height=64,
+        entities=[
+            SceneEntity("SKY_CLEAR", 0.5, 0.2),
+            SceneEntity("GROUND_GRASS", 0.5, 0.8),
+            SceneEntity("TREE_OAK", 0.3, 0.6, scale=1.2),
+        ],
+        time_of_day=0.7,
+        weather="CLEAR"
+    )
+
+    model = NeuralRendererCNN(image_size=64)
+    tensor = gss_to_tensor(scene).unsqueeze(0)
+    output = model(tensor)
+
+    print(f"Entrée  : {tensor.shape}")
+    print(f"Sortie  : {output.shape}")
+    print(f"Paramètres : {sum(p.numel() for p in model.parameters()):,}")
+    print("CNN OK !")
