@@ -83,3 +83,39 @@ if __name__ == "__main__":
     print(f"Min/Max : {output.min():.3f} / {output.max():.3f}")
     print(f"Paramètres : {sum(p.numel() for p in model.parameters()):,}")
     print("MODELE OK !")
+
+    class NeuralRendererCNN(nn.Module):
+    def __init__(self, image_size=64):
+        super().__init__()
+        self.image_size = image_size
+
+        self.encoder = nn.Sequential(
+            nn.Linear(102, 512),
+            nn.LeakyReLU(0.2),
+            nn.BatchNorm1d(512),
+            nn.Linear(512, 1024),
+            nn.LeakyReLU(0.2),
+            nn.BatchNorm1d(1024),
+            nn.Linear(1024, 4*4*256),
+            nn.LeakyReLU(0.2),
+        )
+
+        self.decoder = nn.Sequential(
+            nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(0.2),
+            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(0.2),
+            nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),
+            nn.BatchNorm2d(32),
+            nn.LeakyReLU(0.2),
+            nn.ConvTranspose2d(32, 3, 4, stride=2, padding=1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        features = self.encoder(x)
+        features = features.view(-1, 256, 4, 4)
+        image = self.decoder(features)
+        return image
