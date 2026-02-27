@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>NRVR Game</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#050810; color:#00f5ff; font-family:monospace; overflow:hidden; }
+    #screen { display:block; image-rendering:pixelated; width:512px; height:512px; border:2px solid #00f5ff; }
+    #ui {
+      position:fixed; top:0; left:0; right:0;
+      display:flex; justify-content:space-between; align-items:center;
+      padding:8px 16px;
+      background:rgba(5,8,16,0.8);
+      border-bottom:1px solid #1a2a4a;
+      font-size:11px; letter-spacing:2px;
+    }
+    #container {
+      display:flex; align-items:center; justify-content:center;
+      height:100vh; flex-direction:column; gap:12px;
+      padding-top:40px;
+    }
+    #controls {
+      display:flex; gap:20px;
+      font-size:10px; letter-spacing:1px; color:#4a5a7a;
+    }
+    #status { color:#00ff88; }
+    #gss-info { color:#7b2fff; }
+    #loading {
+      position:fixed; inset:0;
+      background:rgba(5,8,16,0.9);
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; letter-spacing:3px; color:#00f5ff;
+      z-index:100;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading">CHARGEMENT SCÈNE...</div>
+
+<div id="ui">
+  <span>NRVR GAME v0.1</span>
+  <span id="status">EN ATTENTE...</span>
+  <span id="gss-info">GSS: 0 octets</span>
+  <span id="pos">POS: 0,0</span>
+</div>
+
+<div id="container">
+  <img id="screen" src="" />
+  <div id="controls">
+    <span>← → : SE DÉPLACER</span>
+    <span>↑ ↓ : CHANGER MÉTÉO</span>
+    <span>Z X : JOUR / NUIT</span>
+    <span>1-4 : AJOUTER OBJETS</span>
+  </div>
+</div>
+
+<script>
+const API = 'http://51.255.195.70:8000';
+const screen = document.getElementById('screen');
+
+// État du jeu
+let state = {
+  x: 0,
+  time: 0.7,
+  weather: 'CLEAR',
+  objects: []
+};
+
+let rendering = false;
+let pendingRender = false;
+
+// Générer la scène selon la position
+function buildScene() {
+  const entities = [];
+
+  // Ciel selon météo
+  entities.push({
+    entity_type: state.weather === 'CLEAR' ? 'SKY_CLEAR' : 'SKY_STORM',
+    x: 0.5, y: 0.2, scale: 1.0, wind: 0.0, state: 'DEFAULT'
+  });
+
+  // Sol
+  entities.push({
+    entity_type: state.weather === 'STORM' ? 'GROUND_SNOW' : 'GROUND_GRASS',
+    x: 0.5, y: 0.8, scale: 1.0, wind: 0.0, state: 'DEFAULT'
+  });
+
+  // Objets dynamiques selon position X
+  const pos = state.x;
+
+  // Arbres qui apparaissent selon position
+  if (pos % 3 < 1.5) {
+    entities.push({ entity_type: 'TREE_OAK', x: 0.2, y: 0.65, scale: 1.0 + (pos % 1) * 0.3, wind: 0.2, state: 'DEFAULT' });
+  }
+  if (pos % 4 < 2) {
+    entities.push({ entity_type: 'TREE_PINE', x: 0.75, y: 0.6, scale: 0.9, wind: 0.1, state: 'DEFAULT' });
+  }
+  if (pos % 5 < 2.5) {
+    entities.push({ entity_type: 'CLOUD_CUMULUS', x: 0.4 + (pos % 1) * 0.2, y: 0.15, scale: 1.1, wind: 0.3, state: 'DEFAULT' });
+  }
+  if (pos % 7 < 2) {
+    entities.push({ entity_type: 'STRUCT_HOUSE', x: 0.6, y: 0.65, scale: 0.9, wind: 0.0, state: 'DEFAULT' });
+  }
+  if (pos % 6 < 1.5) {
+    entities.push({ entity_type: 'TERRAIN_MOUNT', x: 0.3, y: 0.55, scale: 1.3, wind: 0.0, state: 'DEFAULT' });
+  }
+
+  // Objets ajoutés manuellement
+  for (const obj of state.objects) {
+    entities.push(obj);
+  }
+
+  return {
+    width: 256,
+    height: 256,
+    entities,
+    time_of_day: state.time,
+    weather: state.weather
+  };
+}
+
+async function render() {
+  if (rendering) {
+    pendingRender = true;
+    return;
+  }
+
+  rendering = true;
+  document.getElementById('status').textContent = 'INFÉRENCE...';
+
+  const scene = buildScene();
+  const start = Date.now();
+
+  try {
+    const res = await fetch(API + '/render', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(scene)
+    });
+    const data = await res.json();
+    screen.src = 'data:image/png;base64,' + data.image;
+
+    const ms = Date.now() - start;
+    document.getElementById('status').textContent = `RENDU: ${ms}ms`;
+    document.getElementById('gss-info').textContent = `GSS: ${data.gss_bytes} octets`;
+    document.getElementById('pos').textContent = `POS: ${state.x.toFixed(1)} | TOD: ${state.time.toFixed(2)}`;
+    document.getElementById('loading').style.display = 'none';
+  } catch(e) {
+    document.getElementById('status').textContent = 'ERREUR API';
+  }
+
+  rendering = false;
+  if (pendingRender) {
+    pendingRender = false;
+    render();
+  }
+}
+
+// Contrôles clavier
+document.addEventListener('keydown', (e) => {
+  switch(e.key) {
+    case 'ArrowLeft':  state.x -= 0.5; break;
+    case 'ArrowRight': state.x += 0.5; break;
+    case 'ArrowUp':    state.weather = 'CLEAR'; break;
+    case 'ArrowDown':  state.weather = 'STORM'; break;
+    case 'z': case 'Z': state.time = Math.min(1.0, state.time + 0.1); break;
+    case 'x': case 'X': state.time = Math.max(0.0, state.time - 0.1); break;
+    case '1': state.objects.push({ entity_type: 'TREE_OAK', x: Math.random(), y: 0.5 + Math.random()*0.3, scale: 1.0, wind: 0.2, state: 'DEFAULT' }); break;
+    case '2': state.objects.push({ entity_type: 'STRUCT_HOUSE', x: Math.random(), y: 0.6 + Math.random()*0.2, scale: 0.9, wind: 0.0, state: 'DEFAULT' }); break;
+    case '3': state.objects.push({ entity_type: 'CLOUD_CUMULUS', x: Math.random(), y: 0.1 + Math.random()*0.2, scale: 1.0, wind: 0.3, state: 'DEFAULT' }); break;
+    case '4': state.objects = []; break;
+  }
+  render();
+});
+
+// Premier rendu
+render();
+</script>
+</body>
+</html>
