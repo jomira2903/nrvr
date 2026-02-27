@@ -10,7 +10,8 @@ import os
 import sys
 from PIL import Image
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
 
 from gss.scene import SceneGSS, SceneEntity
 from model.network import NeuralRenderer, gss_to_tensor
@@ -32,9 +33,6 @@ if os.path.exists(model_path):
 else:
     print("Modèle aléatoire (pas de fichier .pth)")
 model.eval()
-print("Modèle chargé !")
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 class EntityInput(BaseModel):
     entity_type: str
