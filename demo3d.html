@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>NRVR — Demo 3D</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#000; overflow:hidden; font-family:monospace; }
+    canvas { display:block; }
+    #hud {
+      position:fixed; top:0; left:0; right:0;
+      display:flex; justify-content:space-between;
+      padding:10px 20px;
+      background:rgba(0,0,0,0.6);
+      color:#00f5ff; font-size:11px; letter-spacing:2px;
+      border-bottom:1px solid #00f5ff33;
+      z-index:10;
+    }
+    #gss-panel {
+      position:fixed; right:0; top:40px; bottom:0;
+      width:220px; background:rgba(0,0,0,0.8);
+      border-left:1px solid #00f5ff33;
+      padding:12px; color:#00f5ff; font-size:9px;
+      overflow-y:auto; z-index:10;
+    }
+    #gss-panel h3 { color:#7b2fff; margin-bottom:8px; font-size:10px; }
+    .entity-row { 
+      padding:4px 6px; margin:2px 0;
+      background:#0a1020; border:1px solid #1a2a4a;
+      border-radius:3px; color:#88aacc;
+    }
+    #controls-hint {
+      position:fixed; bottom:10px; left:50%;
+      transform:translateX(-50%);
+      color:#445566; font-size:9px; letter-spacing:2px;
+      z-index:10;
+    }
+  </style>
+</head>
+<body>
+
+<div id="hud">
+  <span>NRVR WORLD — 3D DEMO</span>
+  <span id="fps">FPS: --</span>
+  <span id="gss-size">GSS: 0 octets</span>
+  <span id="pos-display">POS: 0, 0</span>
+</div>
+
+<div id="gss-panel">
+  <h3>📋 GSS EN DIRECT</h3>
+  <div id="entity-list"></div>
+</div>
+
+<div id="controls-hint">ZQSD / FLÈCHES : DÉPLACER | SOURIS : REGARDER | E : JOUR/NUIT</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── SCÈNE THREE.JS ──
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setPixelRatio(window.devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+// ── BROUILLARD ──
+scene.fog = new THREE.FogExp2(0x87CEEB, 0.015);
+
+// ── LUMIÈRES ──
+const ambientLight = new THREE.AmbientLight(0x404080, 0.5);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xfffaea, 1.2);
+sunLight.position.set(50, 80, 50);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 500;
+sunLight.shadow.camera.left = -100;
+sunLight.shadow.camera.right = 100;
+sunLight.shadow.camera.top = 100;
+sunLight.shadow.camera.bottom = -100;
+scene.add(sunLight);
+
+// ── SOLEIL VISIBLE ──
+const sunGeo = new THREE.SphereGeometry(3, 16, 16);
+const sunMat = new THREE.MeshBasicMaterial({ color: 0xffee88 });
+const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+sunMesh.position.set(50, 80, 50);
+scene.add(sunMesh);
+
+// ── CIEL ──
+scene.background = new THREE.Color(0x87CEEB);
+
+// ── SOL ──
+const groundGeo = new THREE.PlaneGeometry(500, 500, 50, 50);
+const groundMat = new THREE.MeshLambertMaterial({ color: 0x3a7a20 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ── FONCTIONS DE CRÉATION D'OBJETS ──
+
+function createTree(x, z, scale=1) {
+  const group = new THREE.Group();
+  // Tronc
+  const trunkGeo = new THREE.CylinderGeometry(0.2*scale, 0.3*scale, 2*scale, 8);
+  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5a3010 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = scale;
+  trunk.castShadow = true;
+  group.add(trunk);
+  // Feuillage
+  const colors = [0x2d7a1a, 0x3a9422, 0x1f6012];
+  for(let i=0; i<3; i++) {
+    const leavesGeo = new THREE.SphereGeometry((1.5-i*0.2)*scale, 8, 8);
+    const leavesMat = new THREE.MeshLambertMaterial({ color: colors[i] });
+    const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+    leaves.position.y = (2.5+i*0.8)*scale;
+    leaves.castShadow = true;
+    group.add(leaves);
+  }
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+function createPine(x, z, scale=1) {
+  const group = new THREE.Group();
+  const trunkGeo = new THREE.CylinderGeometry(0.15*scale, 0.25*scale, 2*scale, 8);
+  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x4a2808 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = scale;
+  group.add(trunk);
+  for(let i=0; i<4; i++) {
+    const coneGeo = new THREE.ConeGeometry((1.5-i*0.25)*scale, 1.5*scale, 8);
+    const coneMat = new THREE.MeshLambertMaterial({ color: i%2===0 ? 0x1a6614 : 0x0f4a0f });
+    const cone = new THREE.Mesh(coneGeo, coneMat);
+    cone.position.y = (2+i*1.1)*scale;
+    cone.castShadow = true;
+    group.add(cone);
+  }
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+function createHouse(x, z, scale=1) {
+  const group = new THREE.Group();
+  // Murs
+  const wallGeo = new THREE.BoxGeometry(4*scale, 3*scale, 4*scale);
+  const wallMat = new THREE.MeshLambertMaterial({ color: 0xd4b896 });
+  const walls = new THREE.Mesh(wallGeo, wallMat);
+  walls.position.y = 1.5*scale;
+  walls.castShadow = true;
+  walls.receiveShadow = true;
+  group.add(walls);
+  // Toit
+  const roofGeo = new THREE.ConeGeometry(3.2*scale, 2*scale, 4);
+  const roofMat = new THREE.MeshLambertMaterial({ color: 0xc03020 });
+  const roof = new THREE.Mesh(roofGeo, roofMat);
+  roof.position.y = 4*scale;
+  roof.rotation.y = Math.PI/4;
+  roof.castShadow = true;
+  group.add(roof);
+  // Fenêtre lumineuse
+  const windowGeo = new THREE.BoxGeometry(0.8*scale, 0.8*scale, 0.1*scale);
+  const windowMat = new THREE.MeshBasicMaterial({ color: 0xffee88 });
+  const win = new THREE.Mesh(windowGeo, windowMat);
+  win.position.set(0, 1.5*scale, 2.1*scale);
+  group.add(win);
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+function createMountain(x, z, scale=1) {
+  const group = new THREE.Group();
+  const mountGeo = new THREE.ConeGeometry(8*scale, 15*scale, 6);
+  const mountMat = new THREE.MeshLambertMaterial({ color: 0x556070 });
+  const mount = new THREE.Mesh(mountGeo, mountMat);
+  mount.position.y = 7.5*scale;
+  mount.castShadow = true;
+  group.add(mount);
+  // Neige
+  const snowGeo = new THREE.ConeGeometry(3*scale, 5*scale, 6);
+  const snowMat = new THREE.MeshLambertMaterial({ color: 0xddeeff });
+  const snow = new THREE.Mesh(snowGeo, snowMat);
+  snow.position.y = 13*scale;
+  group.add(snow);
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+function createCastle(x, z, scale=1) {
+  const group = new THREE.Group();
+  const bodyGeo = new THREE.BoxGeometry(6*scale, 8*scale, 6*scale);
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0x707080 });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 4*scale;
+  body.castShadow = true;
+  group.add(body);
+  for(let tx of [-2.5, 2.5]) {
+    for(let tz of [-2.5, 2.5]) {
+      const towerGeo = new THREE.CylinderGeometry(0.8*scale, 0.8*scale, 10*scale, 8);
+      const towerMat = new THREE.MeshLambertMaterial({ color: 0x606070 });
+      const tower = new THREE.Mesh(towerGeo, towerMat);
+      tower.position.set(tx*scale, 5*scale, tz*scale);
+      tower.castShadow = true;
+      group.add(tower);
+      const capGeo = new THREE.ConeGeometry(1.2*scale, 2*scale, 8);
+      const capMat = new THREE.MeshLambertMaterial({ color: 0x8b1a1a });
+      const cap = new THREE.Mesh(capGeo, capMat);
+      cap.position.set(tx*scale, 11*scale, tz*scale);
+      group.add(cap);
+    }
+  }
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+// ── GÉNÉRER LE MONDE ──
+const objects = [];
+const worldData = [
+  { type: 'TREE_OAK', x: -10, z: -15, scale: 1.2 },
+  { type: 'TREE_OAK', x: -15, z: -8, scale: 0.9 },
+  { type: 'TREE_PINE', x: 10, z: -12, scale: 1.1 },
+  { type: 'TREE_PINE', x: 15, z: -20, scale: 1.3 },
+  { type: 'STRUCT_HOUSE', x: 8, z: -6, scale: 1.0 },
+  { type: 'STRUCT_HOUSE', x: -8, z: -25, scale: 0.8 },
+  { type: 'TERRAIN_MOUNT', x: -40, z: -60, scale: 1.5 },
+  { type: 'TERRAIN_MOUNT', x: 30, z: -70, scale: 1.2 },
+  { type: 'STRUCT_CASTLE', x: 0, z: -40, scale: 1.0 },
+  { type: 'TREE_OAK', x: 20, z: -5, scale: 1.0 },
+  { type: 'TREE_PINE', x: -20, z: -30, scale: 1.4 },
+  { type: 'TREE_OAK', x: 5, z: -18, scale: 0.8 },
+];
+
+worldData.forEach(obj => {
+  let mesh;
+  switch(obj.type) {
+    case 'TREE_OAK': mesh = createTree(obj.x, obj.z, obj.scale); break;
+    case 'TREE_PINE': mesh = createPine(obj.x, obj.z, obj.scale); break;
+    case 'STRUCT_HOUSE': mesh = createHouse(obj.x, obj.z, obj.scale); break;
+    case 'TERRAIN_MOUNT': mesh = createMountain(obj.x, obj.z, obj.scale); break;
+    case 'STRUCT_CASTLE': mesh = createCastle(obj.x, obj.z, obj.scale); break;
+  }
+  objects.push({ ...obj, mesh });
+});
+
+// ── CAMÉRA ──
+camera.position.set(0, 2, 10);
+camera.rotation.order = 'YXZ';
+
+// ── CONTRÔLES ──
+const keys = {};
+document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+let yaw = 0, pitch = 0;
+let isPointerLocked = false;
+
+renderer.domElement.addEventListener('click', () => {
+  renderer.domElement.requestPointerLock();
+});
+
+document.addEventListener('pointerlockchange', () => {
+  isPointerLocked = document.pointerLockElement === renderer.domElement;
+});
+
+document.addEventListener('mousemove', e => {
+  if (!isPointerLocked) return;
+  yaw -= e.movementX * 0.002;
+  pitch -= e.movementY * 0.002;
+  pitch = Math.max(-Math.PI/3, Math.min(Math.PI/3, pitch));
+});
+
+// ── CYCLE JOUR/NUIT ──
+let timeOfDay = 0.7;
+document.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'e') {
+    timeOfDay = (timeOfDay + 0.1) % 1.0;
+    updateSky();
+  }
+});
+
+function updateSky() {
+  const t = timeOfDay;
+  if (t > 0.5) {
+    const d = (t - 0.5) * 2;
+    scene.background = new THREE.Color(
+      0.1 + d * 0.4,
+      0.3 + d * 0.5,
+      0.5 + d * 0.4
+    );
+    scene.fog.color.setRGB(0.1 + d*0.4, 0.3+d*0.5, 0.5+d*0.4);
+    sunLight.intensity = 0.3 + d * 1.0;
+    ambientLight.intensity = 0.2 + d * 0.4;
+    sunMesh.position.set(50*d, 30+40*d, 50);
+    sunLight.position.copy(sunMesh.position);
+  } else {
+    const n = 1 - t * 2;
+    scene.background = new THREE.Color(0.02, 0.02, 0.08);
+    scene.fog.color.setRGB(0.02, 0.02, 0.08);
+    sunLight.intensity = 0.1;
+    ambientLight.intensity = 0.1;
+    sunMesh.material.color.setHex(0xaaaaff);
+  }
+}
+
+// ── UPDATE GSS PANEL ──
+function updateGSSPanel() {
+  const px = camera.position.x.toFixed(1);
+  const pz = camera.position.z.toFixed(1);
+  document.getElementById('pos-display').textContent = `POS: ${px}, ${pz}`;
+
+  const nearObjects = objects.filter(obj => {
+    const dx = obj.x - camera.position.x;
+    const dz = obj.z - camera.position.z;
+    return Math.sqrt(dx*dx + dz*dz) < 40;
+  });
+
+  const gssBytes = nearObjects.length * 20 + 10;
+  document.getElementById('gss-size').textContent = `GSS: ${gssBytes} octets`;
+
+  const list = document.getElementById('entity-list');
+  list.innerHTML = nearObjects.map(obj => 
+    `<div class="entity-row">${obj.type}<br><span style="color:#445566">${obj.x.toFixed(0)}, ${obj.z.toFixed(0)}</span></div>`
+  ).join('');
+}
+
+// ── BOUCLE PRINCIPALE ──
+let lastTime = 0;
+let frameCount = 0;
+let fpsTime = 0;
+
+function animate(time) {
+  requestAnimationFrame(animate);
+  const delta = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+
+  const speed = 8 * delta;
+  const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+
+  if (keys['z'] || keys['arrowup']) camera.position.addScaledVector(forward, speed);
+  if (keys['s'] || keys['arrowdown']) camera.position.addScaledVector(forward, -speed);
+  if (keys['q'] || keys['arrowleft']) camera.position.addScaledVector(right, -speed);
+  if (keys['d'] || keys['arrowright']) camera.position.addScaledVector(right, speed);
+
+  camera.position.y = 2;
+  camera.rotation.set(pitch, yaw, 0);
+
+  frameCount++;
+  fpsTime += delta;
+  if (fpsTime > 0.5) {
+    document.getElementById('fps').textContent = `FPS: ${Math.round(frameCount/fpsTime)}`;
+    frameCount = 0; fpsTime = 0;
+  }
+
+  updateGSSPanel();
+  renderer.render(scene, camera);
+}
+
+animate(0);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
