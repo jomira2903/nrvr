@@ -16,7 +16,7 @@ l'image finale en temps réel.
 
 ## Demo live
 
-http://51.255.195.70:8000/game
+http://51.255.195.70:8000/demo3d
 
 ## Technologies
 
