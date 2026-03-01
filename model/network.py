@@ -96,7 +96,46 @@ class NeuralRendererCNN(nn.Module):
         image = self.decoder(features)
         return image
 
+class NeuralRendererCNN128(nn.Module):
+    def __init__(self):
+        super().__init__()
 
+        self.encoder = nn.Sequential(
+            nn.Linear(102, 512),
+            nn.LeakyReLU(0.2),
+            nn.BatchNorm1d(512),
+            nn.Linear(512, 1024),
+            nn.LeakyReLU(0.2),
+            nn.BatchNorm1d(1024),
+            nn.Linear(1024, 2048),
+            nn.LeakyReLU(0.2),
+            nn.BatchNorm1d(2048),
+            nn.Linear(2048, 4*4*512),
+            nn.LeakyReLU(0.2),
+        )
+
+        self.decoder = nn.Sequential(
+            nn.ConvTranspose2d(512, 256, 4, stride=2, padding=1),
+            nn.BatchNorm2d(256),
+            nn.LeakyReLU(0.2),
+            nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(0.2),
+            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(0.2),
+            nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),
+            nn.BatchNorm2d(32),
+            nn.LeakyReLU(0.2),
+            nn.ConvTranspose2d(32, 3, 4, stride=2, padding=1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        features = self.encoder(x)
+        features = features.view(-1, 512, 4, 4)
+        return self.decoder(features)
+        
 if __name__ == "__main__":
     from gss.scene import SceneGSS, SceneEntity
 

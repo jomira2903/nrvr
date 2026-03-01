@@ -14,7 +14,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
 from gss.scene import SceneGSS, SceneEntity
-from model.network import NeuralRenderer, NeuralRendererCNN, gss_to_tensor
+from model.network import NeuralRenderer, NeuralRendererCNN, NeuralRendererCNN128, gss_to_tensor
 
 app = FastAPI(title="NRVR API")
 
@@ -25,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model = NeuralRendererCNN(image_size=64)
+model = NeuralRendererCNN128()
 model_path = os.path.join(BASE_DIR, "model_trained.pth")
 if os.path.exists(model_path):
     model.load_state_dict(torch.load(model_path, map_location='cpu'))
