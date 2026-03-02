@@ -13,6 +13,9 @@ from PIL import Image
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from gss.scene import SceneGSS, SceneEntity
 from model.network import NeuralRenderer, NeuralRendererCNN, NeuralRendererCNN128, gss_to_tensor
 
@@ -64,6 +67,11 @@ def game_page():
 @app.get("/demo3d")
 def demo3d_page():
     return FileResponse(os.path.join(BASE_DIR, "demo3d.html"))
+
+@app.get("/config")
+def get_config():
+    key = os.getenv("ANTHROPIC_API_KEY", "")
+    return {"key": key}
 
 @app.post("/render")
 def render(scene_input: SceneInput):
