@@ -454,13 +454,19 @@ Description: ${input}`;
     });
 
     const data = await res.json();
+    console.log("Réponse IA:", JSON.stringify(data));
+
+    if (!data.content || !data.content[0] || !data.content[0].text) {
+      throw new Error("Clé API invalide ou quota dépassé: " + JSON.stringify(data));
+    }
+
     const text = data.content[0].text.trim();
     const clean = text.replace(/```json|```/g, '').trim();
-    const scene = JSON.parse(clean);
+    const sceneData = JSON.parse(clean);
 
-    applyAIScene(scene);
+    applyAIScene(sceneData);
     status.style.color = '#44ff88';
-    status.textContent = 'Scène générée ! ' + scene.objects.length + ' objets ajoutés.';
+    status.textContent = '✅ Scène générée ! ' + sceneData.objects.length + ' objets ajoutés.';
 
   } catch(e) {
     status.style.color = '#ff6666';
