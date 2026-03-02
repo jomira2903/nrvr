@@ -406,7 +406,8 @@ window.addEventListener('resize', () => {
 </div>
 
 <script>
-const AI_KEY = "REMPLACER_PAR_CLE";
+let AI_KEY = "";
+fetch('/config').then(r => r.json()).then(d => { AI_KEY = d.key; });
 
 async function sendToAI() {
   const input = document.getElementById('ai-input').value.trim();
